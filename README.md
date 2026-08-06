@@ -1,7 +1,7 @@
 # Project‑Sync System  
-*(PostgreSQL + Memgraph + SLM Integration)*  
+(*Bash + curl, PostgreSQL + Memgraph + Local SLM Integration*)  
 
-> **TL;DR** – A lightweight service that keeps a PostgreSQL table *and* a Memgraph graph in sync with every `README.md` you keep at the root of each project.  It updates automatically on request, on CI runs, or right before shutdown, and it can ask GPT‑4 to extract tags & relationships from the README.
+> **TL;DR** – A lightweight service that keeps a PostgreSQL table *and* a Memgraph graph in sync with every `README.md` you keep at the root of each project. It updates automatically on request, on CI runs, or right before shutdown, and it can ask a **locally hosted SLM** (Gemma‑4 e2B/e4B, Llama‑3B, etc.) to extract tags & relationships from the README.
 
 ---
 
@@ -13,7 +13,7 @@
 | [Architecture Overview](#architecture-overview) | How components fit together |
 | [Setup Instructions](#setup-instructions) | Install, configure & run the service |
 | [Usage](#usage) | API endpoints, CLI examples, shutdown behavior |
-| [Extending & Customising](#extending--customising) | Add new edge types, change GPT prompt, etc. |
+| [Extending & Customising](#extending--customising) | Add new edge types, change SLM prompt, etc. |
 | [FAQ](#faq) | Common questions answered |
 | [License](#license) | How you can reuse this project |
 
@@ -23,11 +23,11 @@
 
 - **Single source of truth** – all projects live in one PostgreSQL table; the graph lives in Memgraph.
 - **Automatic updates** – sync on CI, manual request or at graceful shutdown.  
-  No need to remember `pg_dump` or `mg-admin dump`.
-- **AI‑powered metadata extraction** – GPT‑4 reads your README and automatically generates:
-  - *Title*, *description*, *tags* (array)  
+- **Local AI‑powered metadata extraction** – A small local SLM reads your README and generates:
+  - *title*, *description*, *tags* (array)  
   - *depends_on* project names (which become edges in the graph)
-- **Extensible** – add new relationship types or GPT prompts without touching the core logic.
+- **Extensible** – add new relationship types or change the SLM prompt without touching core logic.
+- **No cloud dependencies** – runs entirely offline using llama.cpp or any local inference server.
 
 ---
 
@@ -49,11 +49,11 @@
             ▼
 
 ┌───────────────────────┐
-│   Sync‑Engine          │
+│   Sync‑Engine (Bash)   │
 │   – reads README.md    │
-│   – calls GPT‑4         │
-│   – writes to Postgres  │
-│   – writes to Memgraph  │
+│   – calls local SLM    │
+│   – writes to Postgres │
+│   – writes to Memgraph │
 └───────────▲─────────────┘
 
             ▲
@@ -75,44 +75,41 @@
 └───────────────────────┘
 ```
 
-- **FastAPI** gives us a clean HTTP API + lifecycle events.  
-- **Sync‑Engine** is pure Python; it can be called from any script or CI job.  
-- **PostgreSQL** stores static data: `project_id`, `name`, `description`, tags, timestamps.  
-- **Memgraph** stores *directed* edges (`DEPENDS_ON`, …) that let you traverse the project network.
+- **FastAPI** is optional — you can run syncs entirely via Bash.  
+- **Sync‑Engine** is pure Bash + curl + jq.  
+- **PostgreSQL** stores structured metadata.  
+- **Memgraph** stores directed edges (`DEPENDS_ON`, etc.).
+
+---
+
+## Minimal Directory Layout
+
+```
+project-sync/
+├── sync.sh
+├── parse_slm.sh
+├── db_postgres.sh
+├── db_memgraph.sh
+└── projects/
+    ├── Alpha/README.md
+    ├── Beta/README.md
+    └── Gamma/README.md
+```
 
 ---
 
 ## Setup Instructions
 
-> **Prerequisites** – Python 3.10+, PostgreSQL ≥13, Memgraph 4.x, OpenAI API key (for GPT‑4).  
+> **Prerequisites** – Bash + curl, PostgreSQL ≥13, Memgraph 4.x, llama.cpp (or any local inference server).
 
-### 1️⃣ Create a virtual environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate      # Linux / macOS
-.\.venv\Scripts\Activate.ps1   # PowerShell on Windows
-```
-
-### 2️⃣ Install dependencies
-
-```bash
-pip install fastapi uvicorn psycopg2-binary memgraph-driver python-frontmatter openai
-```
-
-> `python-frontmatter` is optional (if you keep YAML front‑matter).  
-> For GPT‑4 you’ll need the official OpenAI SDK.
-
-### 3️⃣ PostgreSQL
+### 1️⃣ Install PostgreSQL
 
 ```sql
 CREATE DATABASE projects;
 \c projects
 
--- create extensions ------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- tables ---------------------------------------------------------
 CREATE TABLE projects (
     project_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT NOT NULL UNIQUE,
@@ -128,95 +125,79 @@ CREATE TABLE project_tags (
 );
 ```
 
-> **Tip** – Keep the DB credentials in a `.env` file:
-
-```dotenv
-PG_DSN=postgresql://postgres:secret@localhost:5432/projects
-MG_URL=http://localhost:7687
-OPENAI_API_KEY=sk-...
-```
-
-### 4️⃣ Memgraph
-
-Download & install from the official site.  Start it with default settings or a custom config.
+### 2️⃣ Install Memgraph
 
 ```bash
-# Example (Linux)
 ./memgraph -c /etc/memgraph/config.json
 ```
 
-> The default HTTP port is **7687** – used by `memgraph-driver`.
+Default HTTP port: **7687**
 
-### 5️⃣ Put your README
+### 3️⃣ Start your local SLM
 
-Create `README.md` at the root of any project you want to track.  
-Example:
-
-```markdown
----
-title: Example‑Alpha
-description: A simple data pipeline that pulls CSVs into a Postgres table.
-tags:
-  - ETL
-  - csv
-depends_on:
-  - Beta   # will create DEPENDS_ON edge to the project named “Beta”
----
-
-# Example‑Alpha
-
-This is a minimal example … 
-```
-
-> **If you don’t have YAML front‑matter** – GPT will still parse it (see section *GPT Extraction* below).
-
-### 6️⃣ Run the service
+Example (llama.cpp server):
 
 ```bash
-uvicorn fastapi_app:app --host 0.0.0.0 --port 8000
+./server -m models/gemma-4-e2b.gguf -c 4096
 ```
 
-The app listens on `http://localhost:8000`.
+This exposes an OpenAI‑style API at:
+
+```
+http://localhost:8080/v1/chat/completions
+```
+
+### 4️⃣ Add your README files
+
+Each project must have:
+
+```
+projects/<ProjectName>/README.md
+```
+
+YAML front‑matter is optional.
 
 ---
 
 ## Usage
 
-| Action | Endpoint / Command | What it does |
-|--------|-------------------|--------------|
-| **Health check** | `GET /health` | Returns `{"status":"ok"}` |
-| **Sync a single project** | `POST /sync/<project_name>` | Finds `<project_name>/README.md`, extracts metadata via GPT, writes to both DBs.  Response: `{ "uuid": "<UUID>" }` |
-| **Manual sync of all README files** | Run `python -m fastapi_app.sync_all` (custom script) | Loops through every README and calls the engine – handy for local dev |
-| **Graceful shutdown** | Send SIGINT (`Ctrl+C`) or kill the process | FastAPI’s `shutdown` event runs a final sync of all README files in the current working directory before exiting. |
+| Action | Command / Endpoint | What it does |
+|--------|--------------------|--------------|
+| **Sync a single project** | `./sync.sh Alpha` | Reads README, calls SLM, writes to both DBs |
+| **Sync all projects** | `for p in projects/*; do ./sync.sh "$(basename "$p")"; done` | Batch sync |
+| **FastAPI endpoint (optional)** | `POST /sync/<project>` | Wraps the Bash sync engine |
+| **Shutdown sync** | systemd service | Runs sync on shutdown |
 
-### Example curl
+### Example
 
 ```bash
-curl -X POST http://localhost:8000/sync/Example-Alpha
+./sync.sh Example-Alpha
 ```
 
-Response:
+Output:
 
 ```json
-{
-  "uuid": "3e8d5b23-2a9f-4c6d-b1bd-6ecb7e2b1ff7"
-}
+{ "uuid": "3e8d5b23-2a9f-4c6d-b1bd-6ecb7e2b1ff7" }
 ```
-
-You can now query Postgres or Memgraph directly.
 
 ---
 
-## GPT‑4 Extraction (Optional)
+## Local SLM Extraction
 
-If you prefer deterministic parsing instead of GPT, replace the `extract_metadata()` function in `sync.py` with your own logic:
+Replace GPT‑4 with your local model:
 
-```python
-def extract_metadata(content: str) -> dict:
-    # Use frontmatter.load_file or regex to pull fields.
+```bash
+curl -s http://localhost:8080/v1/chat/completions \
+  -d '{
+    "model": "local-slm",
+    "messages": [
+      { "role": "system", "content": "Extract JSON metadata: title, description, tags[], depends_on[]" },
+      { "role": "user", "content": "'"$README_CONTENT"'" }
+    ]
+  }'
 ```
 
-The rest of the sync engine stays unchanged.
+Parse with `jq`.
 
 ---
 
@@ -224,34 +205,31 @@ The rest of the sync engine stays unchanged.
 
 | Feature | How |
 |---------|-----|
-| **New edge type** | Add a new `MERGE (a)-[:NEW_EDGE]->(b)` line in `sync_from_path()`; add a check for `"new_edge"` key in GPT JSON. |
-| **Custom GPT prompt** | Edit the string passed to `openai.ChatCompletion.create` – keep it short, but include your own instructions. |
-| **Batch sync CLI** | Add a new FastAPI endpoint `/batch-sync` that accepts a list of project names. |
-| **Graph analytics endpoint** | Create `/graph/<uuid>/downstream` returning all nodes reachable via `DEPENDS_ON`. |
+| **New edge type** | Add a new Cypher `MERGE (a)-[:NEW_EDGE]->(b)` in `db_memgraph.sh` |
+| **Custom SLM prompt** | Edit the system message in `parse_slm.sh` |
+| **Batch sync CLI** | Add a wrapper script that loops through `projects/*` |
+| **Graph analytics endpoint** | Add FastAPI route calling Memgraph Cypher queries |
 
 ---
 
 ## FAQ
 
-- **Q: Do I need to keep the README in YAML format?**  
-  **A:** No – GPT will parse plain Markdown.  If you use YAML front‑matter it’s faster and deterministic.
+- **Q: Do I need YAML front‑matter?**  
+  **A:** No — the SLM can parse plain Markdown.
 
-- **Q: What if two projects have the same name?**  
-  **A:** PostgreSQL enforces `name` uniqueness.  Rename or add a prefix to avoid collision.
+- **Q: Do I need an API key?**  
+  **A:** No — local SLMs require no authentication.
 
-- **Q: How often does GPT run?**  
-  **A:** Once per sync request (API call, CI job, shutdown).  You can cache results in a separate table if you worry about rate‑limits.
+- **Q: How often does the SLM run?**  
+  **A:** Once per sync request.
 
-- **Q: Can I use another LLM provider?**  
-  **A:** Absolutely.  Replace the `openai` import with your SDK and adjust the API key env var.
+- **Q: Can I use a different local model?**  
+  **A:** Yes — anything callable via HTTP or CLI works.
 
 ---
 
 ## License
 
-MIT – feel free to copy, modify, or commercialise this project.  
+MIT — feel free to copy, modify, or commercialise this project.
 
-> See the [LICENSE](./LICENSE) file for details.
-
---- 
-
+---
