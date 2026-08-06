@@ -1,84 +1,67 @@
 # Project‑Sync System  
 (*Bash + curl, PostgreSQL + Memgraph + Local SLM Integration*)  
 
-> **TL;DR** – A lightweight service that keeps a PostgreSQL table *and* a Memgraph graph in sync with every `README.md` you keep at the root of each project. It updates automatically on request, on CI runs, or right before shutdown, and it can ask a **locally hosted SLM** (Gemma‑4 e2B/e4B, Llama‑3B, etc.) to extract tags & relationships from the README.
+> **TL;DR** – A lightweight system that keeps a PostgreSQL table *and* a Memgraph graph in sync with every `README.md` stored at the root of each project. It updates automatically on request, via CI, or at shutdown. A **locally hosted SLM** (Gemma‑4 e2B/e4B, Llama‑3B, etc.) extracts metadata such as tags and dependency relationships — entirely offline.
 
 ---
 
 ## Table of Contents
 
 | Section | What you’ll find |
-|---------|-----------------|
-| [Why this?](#why-this) | The problem we solve |
+|---------|------------------|
+| [Why This?](#why-this) | The problem we solve |
 | [Architecture Overview](#architecture-overview) | How components fit together |
-| [Setup Instructions](#setup-instructions) | Install, configure & run the service |
-| [Usage](#usage) | API endpoints, CLI examples, shutdown behavior |
-| [Extending & Customising](#extending--customising) | Add new edge types, change SLM prompt, etc. |
-| [FAQ](#faq) | Common questions answered |
+| [Setup Instructions](#setup-instructions) | Install, configure & run the system |
+| [Usage](#usage) | CLI examples, optional API endpoints |
+| [Extending & Customising](#extending--customising) | Add new edge types, change SLM prompt |
+| [FAQ](#faq) | Common questions |
 | [License](#license) | How you can reuse this project |
 
 ---
 
 ## Why This?
 
-- **Single source of truth** – all projects live in one PostgreSQL table; the graph lives in Memgraph.
-- **Automatic updates** – sync on CI, manual request or at graceful shutdown.  
-- **Local AI‑powered metadata extraction** – A small local SLM reads your README and generates:
+- **Single source of truth** – all project metadata lives in PostgreSQL; relationships live in Memgraph.
+- **Automatic updates** – sync on CI, manual request, or graceful shutdown.
+- **Local AI‑powered metadata extraction** – A small SLM reads your README and generates:
   - *title*, *description*, *tags* (array)  
-  - *depends_on* project names (which become edges in the graph)
-- **Extensible** – add new relationship types or change the SLM prompt without touching core logic.
-- **No cloud dependencies** – runs entirely offline using llama.cpp or any local inference server.
+  - *depends_on* project names → stored as graph edges
+- **Offline‑first** – no API keys, no cloud dependencies, no rate limits.
+- **Extensible** – add new relationship types or modify the SLM prompt without touching core logic.
 
 ---
 
 ## Architecture Overview
 
 ```
-┌───────────────────────┐
-│   FastAPI Service       │
-│   └──/sync/<project>   │
-├───────────┬─────────────┤
-│          │             │
-│ 1. Request /sync/…    │
-│ 2. CI job (post‑push)│
-│ 3. Shutdown hook     │
-└───────▲────────────────┘
-
-            ▲
+┌──────────────────────────┐
+│   Optional FastAPI Layer │
+│   └── POST /sync/<name>  │
+└───────────▲──────────────┘
             │
             ▼
-
-┌───────────────────────┐
-│   Sync‑Engine (Bash)   │
-│   – reads README.md    │
-│   – calls local SLM    │
-│   – writes to Postgres │
-│   – writes to Memgraph │
-└───────────▲─────────────┘
-
-            ▲
+┌──────────────────────────┐
+│   Sync‑Engine (Bash)      │
+│   – reads README.md       │
+│   – calls local SLM       │
+│   – writes to PostgreSQL  │
+│   – writes to Memgraph    │
+└───────────▲──────────────┘
             │
             ▼
-
-┌───────────────────────┐
-│  PostgreSQL            │
-│  projects, tags        │
-└───────────────────────┘
-
+┌──────────────────────────┐
+│   PostgreSQL (metadata)   │
+└──────────────────────────┘
             ▲
-            │
             ▼
-
-┌───────────────────────┐
-│  Memgraph              │
-│  nodes & relationships │
-└───────────────────────┘
+┌──────────────────────────┐
+│   Memgraph (graph edges)  │
+└──────────────────────────┘
 ```
 
-- **FastAPI** is optional — you can run syncs entirely via Bash.  
 - **Sync‑Engine** is pure Bash + curl + jq.  
-- **PostgreSQL** stores structured metadata.  
-- **Memgraph** stores directed edges (`DEPENDS_ON`, etc.).
+- **SLM** runs locally via llama.cpp or any compatible inference server.  
+- **FastAPI** is optional — the system works perfectly without it.
 
 ---
 
@@ -100,7 +83,7 @@ project-sync/
 
 ## Setup Instructions
 
-> **Prerequisites** – Bash + curl, PostgreSQL ≥13, Memgraph 4.x, llama.cpp (or any local inference server).
+> **Prerequisites** – Bash, curl, jq, PostgreSQL ≥13, Memgraph 4.x, llama.cpp (or any local inference server).
 
 ### 1️⃣ Install PostgreSQL
 
@@ -165,7 +148,7 @@ YAML front‑matter is optional.
 |--------|--------------------|--------------|
 | **Sync a single project** | `./sync.sh Alpha` | Reads README, calls SLM, writes to both DBs |
 | **Sync all projects** | `for p in projects/*; do ./sync.sh "$(basename "$p")"; done` | Batch sync |
-| **FastAPI endpoint (optional)** | `POST /sync/<project>` | Wraps the Bash sync engine |
+| **Optional FastAPI wrapper** | `POST /sync/<project>` | Calls the Bash sync engine |
 | **Shutdown sync** | systemd service | Runs sync on shutdown |
 
 ### Example
@@ -184,10 +167,11 @@ Output:
 
 ## Local SLM Extraction
 
-Replace GPT‑4 with your local model:
+The sync engine sends the README to your local model:
 
 ```bash
 curl -s http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
   -d '{
     "model": "local-slm",
     "messages": [
@@ -197,7 +181,18 @@ curl -s http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-Parse with `jq`.
+The SLM returns JSON such as:
+
+```json
+{
+  "title": "Example-Alpha",
+  "description": "A simple pipeline...",
+  "tags": ["ETL", "csv"],
+  "depends_on": ["Beta"]
+}
+```
+
+Parsed with `jq`.
 
 ---
 
@@ -207,7 +202,7 @@ Parse with `jq`.
 |---------|-----|
 | **New edge type** | Add a new Cypher `MERGE (a)-[:NEW_EDGE]->(b)` in `db_memgraph.sh` |
 | **Custom SLM prompt** | Edit the system message in `parse_slm.sh` |
-| **Batch sync CLI** | Add a wrapper script that loops through `projects/*` |
+| **Batch sync CLI** | Add a wrapper script looping through `projects/*` |
 | **Graph analytics endpoint** | Add FastAPI route calling Memgraph Cypher queries |
 
 ---
@@ -218,13 +213,16 @@ Parse with `jq`.
   **A:** No — the SLM can parse plain Markdown.
 
 - **Q: Do I need an API key?**  
-  **A:** No — local SLMs require no authentication.
+  **A:** No — everything runs locally.
 
 - **Q: How often does the SLM run?**  
   **A:** Once per sync request.
 
 - **Q: Can I use a different local model?**  
-  **A:** Yes — anything callable via HTTP or CLI works.
+  **A:** Yes — any model callable via HTTP or CLI works.
+
+- **Q: Can I remove FastAPI entirely?**  
+  **A:** Yes — the Bash sync engine is fully standalone.
 
 ---
 
@@ -233,3 +231,11 @@ Parse with `jq`.
 MIT — feel free to copy, modify, or commercialise this project.
 
 ---
+
+If you want, I can also generate:
+
+- **a checksum‑based sync engine**  
+- **a systemd shutdown‑sync service**  
+- **a minimal FastAPI wrapper that calls your Bash scripts**  
+
+Just tell me which one you want next William.
