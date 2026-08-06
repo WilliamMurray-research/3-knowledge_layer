@@ -232,10 +232,3 @@ MIT — feel free to copy, modify, or commercialise this project.
 
 ---
 
-If you want, I can also generate:
-
-- **a checksum‑based sync engine**  
-- **a systemd shutdown‑sync service**  
-- **a minimal FastAPI wrapper that calls your Bash scripts**  
-
-Just tell me which one you want next William.
