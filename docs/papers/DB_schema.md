@@ -1,11 +1,11 @@
-A Dual‑Layer Metadata Schema for Research Corpus Indexing: Design Principles, Structure, and Normalisation
+# A Dual‑Layer Metadata Schema for Research Corpus Indexing: Design Principles, Structure, and Normalisation
 
-Abstract
+## Abstract  
 This paper presents a schema architecture for a dual‑layer metadata system that synchronises structured relational data in PostgreSQL with graph‑based relationship data in Memgraph. The system indexes and relates a large research corpus (~8,500 files) using a lightweight Bash‑driven sync engine and a local small‑language‑model (SLM) for metadata extraction. We outline the schema design, justify normalisation choices, and explain how relational and graph layers complement each other to form a unified knowledge layer.
 
 ---
 
-1. Introduction
+## 1. Introduction  
 Large research repositories often contain thousands of project folders, each with its own README.md describing purpose, dependencies, and conceptual relationships. Traditional relational databases excel at storing structured metadata, while graph databases excel at representing relationships. The Project‑Sync System integrates both:
 
 - PostgreSQL stores canonical project metadata.
@@ -16,9 +16,9 @@ This paper focuses on the schema design underpinning this architecture, with spe
 
 ---
 
-2. Schema Overview
+## 2. Schema Overview  
 
-2.1 Relational Layer (PostgreSQL)
+### 2.1 Relational Layer (PostgreSQL)
 The relational schema stores project‑level metadata extracted from README.md files.
 
 Tables
@@ -38,7 +38,7 @@ This schema is intentionally minimal. It stores only intrinsic metadata: attribu
 
 ---
 
-2.2 Graph Layer (Memgraph)
+### 2.2 Graph Layer (Memgraph)
 The graph schema stores inter‑project relationships, such as:
 
 - (:Project)-[:DEPENDS_ON]->(:Project)
@@ -53,9 +53,9 @@ Graph databases excel at representing variable‑length, multi‑hop relationshi
 
 ---
 
-3. Normalisation Principles
+## 3. Normalisation Principles
 
-3.1 Why Normalisation Matters
+### 3.1 Why Normalisation Matters
 Normalisation ensures:
 
 - elimination of redundancy  
@@ -67,9 +67,9 @@ In a dual‑layer system, normalisation also prevents cross‑system duplication
 
 ---
 
-4. Normal Forms Applied
+## 4. Normal Forms Applied
 
-4.1 First Normal Form (1NF)
+### 4.1 First Normal Form (1NF)
 All tables contain atomic values:
 
 - Tags are stored as individual rows in project_tags.
@@ -79,7 +79,7 @@ This ensures clean indexing and simple joins.
 
 ---
 
-4.2 Second Normal Form (2NF)
+### 4.2 Second Normal Form (2NF)
 Every non‑key attribute depends on the whole key:
 
 - In projecttags, the tag depends on projectid, not on the surrogate key id.
@@ -88,7 +88,7 @@ This avoids partial dependencies.
 
 ---
 
-4.3 Third Normal Form (3NF)
+### 4.3 Third Normal Form (3NF)
 No transitive dependencies:
 
 - Project descriptions depend only on the project.
@@ -99,7 +99,7 @@ This separation is crucial: relationships are not intrinsic metadata.
 
 ---
 
-5. Why Relationships Are Not Stored in PostgreSQL
+## 5. Why Relationships Are Not Stored in PostgreSQL
 Relational databases can store relationships, but they do not excel at:
 
 - multi‑hop traversal  
@@ -123,7 +123,7 @@ This is a form of domain‑driven normalisation.
 
 ---
 
-6. Cross‑Layer Consistency
+## 6. Cross‑Layer Consistency
 The sync engine ensures:
 
 - PostgreSQL is the single source of truth for project identity.  
@@ -135,9 +135,9 @@ This avoids duplication and maintains referential integrity across systems.
 
 ---
 
-7. Extended Schema Considerations
+## 7. Extended Schema Considerations
 
-7.1 Additional Metadata Tables
+### 7.1 Additional Metadata Tables
 Future expansions may include:
 
 - project_dependencies  
@@ -149,7 +149,7 @@ Each should follow 3NF principles.
 
 ---
 
-7.2 Additional Graph Edge Types
+### 7.2 Additional Graph Edge Types
 Examples:
 
 - [:SIMILAR_TO]  
@@ -161,24 +161,24 @@ These edges should remain exclusively in Memgraph.
 
 ---
 
-8. Benefits of This Schema Design
+## 8. Benefits of This Schema Design
 
-8.1 Scalability
+### 8.1 Scalability
 Normalised relational tables scale to tens of thousands of projects.  
 Graph edges scale to millions of relationships.
 
-8.2 Flexibility
+### 8.2 Flexibility
 New edge types can be added without modifying relational schema.
 
-8.3 Offline‑First AI Integration
+### 8.3 Offline‑First AI Integration
 The SLM extracts metadata without cloud dependencies.
 
-8.4 Clean Separation of Concerns
+### 8.4 Clean Separation of Concerns
 Metadata and relationships remain distinct, reducing complexity.
 
 ---
 
-9. Conclusion
+## 9. Conclusion
 The dual‑layer schema described here provides a robust foundation for indexing and relating a large research corpus. Normalisation ensures consistency and scalability, while the graph layer enables rich relationship analysis. Together, PostgreSQL and Memgraph form a unified knowledge layer that is lightweight, extensible, and fully offline‑capable.
 
 ---
