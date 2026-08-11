@@ -1,12 +1,11 @@
+# Normalisation and Efficiency: A Technical Examination of Relational Schema Design  
 
-Normalisation and Efficiency: A Technical Examination of Relational Schema Design
-
-Abstract
+## Abstract  
 Normalisation is traditionally taught as a method for reducing redundancy and improving data integrity. However, in large‑scale systems, normalisation also has direct consequences for performance, query efficiency, storage utilisation, and long‑term maintainability. This paper examines normalisation through the lens of efficiency, analysing how each normal form affects read/write performance, indexing strategies, caching behaviour, and cross‑system architectures. We argue that normalisation is not merely a correctness tool but a foundational optimisation strategy for relational systems.
 
 ---
 
-1. Introduction
+## 1. Introduction  
 Normalisation is often presented as a theoretical discipline, but its practical implications are deeply tied to efficiency. In modern systems — including hybrid architectures where relational databases coexist with graph engines — normalisation determines:
 
 - how quickly queries execute  
@@ -18,7 +17,7 @@ This paper reframes normalisation as an efficiency‑driven design principle rat
 
 ---
 
-2. Efficiency Goals in Relational Schema Design
+## 2. Efficiency Goals in Relational Schema Design  
 Before analysing normal forms, we define the efficiency goals normalisation seeks to support:
 
 - Minimised redundancy → fewer writes, fewer updates, smaller storage footprint  
@@ -31,7 +30,7 @@ Normalisation directly influences each of these.
 
 ---
 
-3. First Normal Form (1NF) and Efficiency
+## 3. First Normal Form (1NF) and Efficiency  
 1NF requires atomic values and prohibits repeating groups.
 
 Efficiency Implications
@@ -51,7 +50,7 @@ Storing tags in a separate table (project_tags) rather than as a comma‑separat
 
 ---
 
-4. Second Normal Form (2NF) and Efficiency
+## 4. Second Normal Form (2NF) and Efficiency  
 2NF eliminates partial dependencies in composite keys.
 
 Efficiency Implications
@@ -71,7 +70,7 @@ If a table uses (projectid, tag) as a composite key, storing attributes that dep
 
 ---
 
-5. Third Normal Form (3NF) and Efficiency
+## 5. Third Normal Form (3NF) and Efficiency  
 3NF removes transitive dependencies.
 
 Efficiency Implications
@@ -93,7 +92,7 @@ Separating them:
 
 ---
 
-6. Beyond 3NF: When Normalisation Meets Performance Trade‑offs
+## 6. Beyond 3NF: When Normalisation Meets Performance Trade‑offs  
 Higher normal forms (BCNF, 4NF, 5NF) further reduce redundancy but introduce trade‑offs:
 
 Efficiency Costs
@@ -113,7 +112,7 @@ The optimal level of normalisation depends on workload:
 
 ---
 
-7. Normalisation in Hybrid Architectures
+## 7. Normalisation in Hybrid Architectures  
 In systems combining relational and graph databases, normalisation has architectural efficiency implications.
 
 Relational Layer Efficiency
@@ -142,27 +141,27 @@ This separation reduces load on both systems and improves global efficiency.
 
 ---
 
-8. Normalisation and Query Efficiency
+## 8. Normalisation and Query Efficiency  
 Normalisation improves query efficiency through:
 
-8.1 Smaller Rows
+### 8.1 Smaller Rows  
 Smaller rows → more rows per page → fewer page reads.
 
-8.2 Better Index Selectivity
+### 8.2 Better Index Selectivity  
 Atomic values produce highly selective indexes.
 
-8.3 Reduced Lock Contention
+### 8.3 Reduced Lock Contention  
 Updates affect fewer rows and fewer tables.
 
-8.4 Faster Planning
+### 8.4 Faster Planning  
 Simpler schemas reduce planner overhead.
 
-8.5 Predictable Execution Plans
+### 8.5 Predictable Execution Plans  
 Normalised schemas avoid pathological cases where the planner misestimates row counts due to embedded lists or redundant data.
 
 ---
 
-9. Normalisation and Write Efficiency
+## 9. Normalisation and Write Efficiency   
 Normalisation reduces write cost by:
 
 - eliminating redundant fields  
@@ -175,7 +174,7 @@ Write efficiency is often overlooked but becomes critical at scale.
 
 ---
 
-10. Conclusion
+## 10. Conclusion  
 Normalisation is not merely a theoretical construct; it is a practical efficiency strategy. Properly normalised schemas:
 
 - reduce storage  
