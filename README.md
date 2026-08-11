@@ -232,3 +232,4 @@ MIT — feel free to copy, modify, or commercialise this project.
 
 ---
 
+**Contributions are off**
