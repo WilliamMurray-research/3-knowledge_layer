@@ -1,12 +1,12 @@
 
 # Knowledge Layer: A Dual‑Layer Semantic Indexing and Provenance System for Research Ecosystems
 
-## Abstract
+## Abstract  
 The Knowledge Layer is a dual‑layer indexing and relationship‑mapping system designed to unify, structure, and relate the entire research corpus (~8,500+ files). It synchronizes a PostgreSQL metadata table with a Memgraph relationship graph, using a lightweight Bash‑based sync engine and a locally hosted small‑language‑model (SLM) for offline metadata extraction. This whitepaper presents the system architecture, metadata model, synchronization protocol, provenance semantics, and extensibility mechanisms that define the Knowledge Layer as a foundational substrate for governed research ecosystems.
 
 ---
 
-1. Introduction
+## 1. Introduction 
 Large research ecosystems accumulate thousands of artefacts—papers, frameworks, proofs, algorithms, DSLs, specifications, and project READMEs. Without a governed indexing system, these artefacts become fragmented, untraceable, and semantically disconnected.
 
 The Knowledge Layer solves this problem by providing:
@@ -27,7 +27,7 @@ This system forms the semantic substrate required for programme‑level governan
 
 ---
 
-2. Motivation
+## 2. Motivation  
 Research ecosystems require:
 
 - semantic indexing  
@@ -55,10 +55,10 @@ It is the semantic backbone of the entire research programme.
 
 ---
 
-3. System Overview
+## 3. System Overview  
 The Knowledge Layer consists of four components:
 
-3.1 Sync Engine (Bash + curl + jq)
+### 3.1 Sync Engine (Bash + curl + jq)  
 Responsible for:
 
 - reading project README.md files  
@@ -70,7 +70,7 @@ The document states:
 
 > “Sync‑Engine is pure Bash + curl + jq.”
 
-3.2 Local SLM (llama.cpp or compatible)
+### 3.2 Local SLM (llama.cpp or compatible)  
 Extracts:
 
 - title  
@@ -82,7 +82,7 @@ As described:
 
 > “A small SLM reads your README and generates: title, description, tags (array), depends_on project names.”
 
-3.3 PostgreSQL (metadata layer)
+### 3.3 PostgreSQL (metadata layer)  
 Stores:
 
 - project names  
@@ -90,7 +90,7 @@ Stores:
 - timestamps  
 - tags  
 
-3.4 Memgraph (relationship layer)
+### 3.4 Memgraph (relationship layer)  
 Stores:
 
 - dependency edges  
@@ -99,7 +99,7 @@ Stores:
 
 ---
 
-4. Architecture
+## 4. Architecture  
 `
 ┌──────────────────────────┐
 │   Optional FastAPI Layer │
@@ -132,7 +132,7 @@ The architecture is explicitly described in the attached document:
 
 ---
 
-5. Directory Layout
+## 5. Directory Layout  
 `
 project-sync/
 ├── sync.sh
@@ -149,9 +149,9 @@ This minimal layout ensures deterministic behaviour and easy extension.
 
 ---
 
-6. Metadata Model
+## 6. Metadata Model  
 
-6.1 PostgreSQL Schema
+### 6.1 PostgreSQL Schema
 The attached document provides the exact schema:
 
 > *“CREATE TABLE projects (  
@@ -170,7 +170,7 @@ Tags are stored separately:
 >     tag TEXT  
 > );”*
 
-6.2 Memgraph Schema
+### 6.2 Memgraph Schema  
 Dependency edges are stored as:
 
 `
@@ -181,23 +181,23 @@ Additional edge types can be added by modifying db_memgraph.sh.
 
 ---
 
-7. Synchronization Protocol
+## 7. Synchronization Protocol  
 
-7.1 Step 1 — Read README.md
+### 7.1 Step 1 — Read README.md  
 Sync engine loads the project’s README.
 
-7.2 Step 2 — Call Local SLM
+### 7.2 Step 2 — Call Local SLM  
 The attached document shows the exact call:
 
 > “Extract JSON metadata: title, description, tags[], depends_on[]”
 
-7.3 Step 3 — Write Metadata to PostgreSQL
+### 7.3 Step 3 — Write Metadata to PostgreSQL  
 Metadata is inserted or updated.
 
-7.4 Step 4 — Write Edges to Memgraph
+### 7.4 Step 4 — Write Edges to Memgraph  
 Dependency edges are created or updated.
 
-7.5 Step 5 — Optional FastAPI Trigger
+### 7.5 Step 5 — Optional FastAPI Trigger  
 FastAPI provides:
 
 - /sync/<project> endpoint  
@@ -206,7 +206,7 @@ FastAPI provides:
 
 ---
 
-8. Local SLM Extraction
+## 8. Local SLM Extraction  
 The SLM is called via an OpenAI‑style API:
 
 > “curl -s http://localhost:8080/v1/chat/completions …”
@@ -219,27 +219,27 @@ This ensures deterministic metadata extraction.
 
 ---
 
-9. Workflow Semantics
+## 9. Workflow Semantics  
 
-9.1 Sync a Single Project
+### 9.1 Sync a Single Project  
 `
 ./sync.sh Alpha
 `
 
-9.2 Sync All Projects
+### 9.2 Sync All Projects  
 `
 for p in projects/*; do ./sync.sh "$(basename "$p")"; done
 `
 
-9.3 Shutdown Sync
+### 9.3 Shutdown Sync  
 A systemd service triggers sync on shutdown.
 
-9.4 CI Sync
+### 9.4 CI Sync  
 CI pipelines can call FastAPI or the Bash engine directly.
 
 ---
 
-10. Extensibility
+## 10. Extensibility
 
 | Feature | How to Extend |
 |--------|----------------|
@@ -254,7 +254,7 @@ The attached document states:
 
 ---
 
-11. Design Principles
+## 11. Design Principles  
 
 | Principle | Meaning |
 |----------|---------|
@@ -266,7 +266,7 @@ The attached document states:
 
 ---
 
-12. Applications
+## 12. Applications  
 
 The Knowledge Layer is ideal for:
 
@@ -282,11 +282,8 @@ It is the semantic substrate for the Unified Asset Registry and the Project Temp
 
 ---
 
-13. Conclusion
+## 13. Conclusion  
 The Knowledge Layer provides a governed, deterministic, offline‑first indexing system for research ecosystems. By combining PostgreSQL metadata, Memgraph relationships, Bash‑based synchronization, and local SLM extraction, it forms the semantic backbone required for programme‑level governance, provenance tracking, and cross‑domain coherence.
-
-It is not a utility.  
-It is an architectural substrate.
 
 ---
 
