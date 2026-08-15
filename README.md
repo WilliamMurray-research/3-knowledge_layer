@@ -1,5 +1,28 @@
-# Project‑Sync System  
-(*Bash + curl, PostgreSQL + Memgraph + Local SLM Integration*)  
+`2026-1003-D-read-001.md`  
+
+---
+
+**CLASSIFICATION**: D  
+
+**Document Reference**: `2026-1003-D-read-001`   
+# Project‑Sync System 
+### Project      
+
+**Type**: read  
+**Classification**: D  
+**Version**: 0.1     
+
+William Murray  
+Systems Architect  
+14 August 2026  
+
+**Status**: Draft     
+
+**Scope**: A lightweight, offline‑first synchronisation system that keeps PostgreSQL metadata and Memgraph relationships aligned with README.md files across local projects. Designed as a personal learning exercise in Bash‑based automation, graph‑database modelling, and local SLM‑powered metadata extraction.  
+
+**Primary Model / Scheme**: README Metadata Schema v0.1 — defines title, description, tags, dependency edges, and project‑level attributes extracted by the local SLM.
+
+---
 
 > **TL;DR** – A lightweight system that keeps a PostgreSQL table *and* a Memgraph graph in sync with every `README.md` stored at the root of each project. It updates automatically on request, via CI, or at shutdown. A **locally hosted SLM** (Gemma‑4 e2B/e4B, Llama‑3B, etc.) extracts metadata such as tags and dependency relationships — entirely offline.
 
