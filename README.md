@@ -5,7 +5,7 @@
 **CLASSIFICATION**: D  
 
 **Document Reference**: `2026-2003-D-read-000`   
-# Project‑Sync System 
+# Knowledge Layer  
 ### Project      
 
 **Classification**: D  
