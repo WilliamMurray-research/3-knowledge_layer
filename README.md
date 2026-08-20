@@ -1,14 +1,13 @@
-`2026-1003-D-read-001.md`  
+`2026-2003-D/README.md`  
 
 ---
 
 **CLASSIFICATION**: D  
 
-**Document Reference**: `2026-1003-D-read-001`   
+**Document Reference**: `2026-2003-D-read-000`   
 # Project‑Sync System 
 ### Project      
 
-**Type**: read  
 **Classification**: D  
 **Version**: 0.1     
 
